@@ -19,6 +19,8 @@ export type CipherEnvelope = {
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 const PBKDF2_ITERATIONS = 310_000;
+const MAX_TOKEN_LENGTH = 24_000;
+const MAX_URL_LENGTH = 4_096;
 
 function randomBytes(length: number) {
   return crypto.getRandomValues(new Uint8Array(length));
@@ -45,6 +47,10 @@ function encodeEnvelope(envelope: CipherEnvelope) {
 }
 
 export function parseEnvelope(token: string): CipherEnvelope {
+  if (!token || token.length > MAX_TOKEN_LENGTH) {
+    throw new Error("Invalid Cipher envelope size");
+  }
+
   const raw = decoder.decode(base64UrlToBytes(token));
   const parsed = JSON.parse(raw) as Partial<CipherEnvelope>;
 
@@ -52,16 +58,18 @@ export function parseEnvelope(token: string): CipherEnvelope {
     parsed.v !== 1 ||
     (parsed.mode !== "key" && parsed.mode !== "code") ||
     typeof parsed.iv !== "string" ||
-    typeof parsed.data !== "string"
+    typeof parsed.data !== "string" ||
+    parsed.iv.length > 64 ||
+    parsed.data.length > MAX_TOKEN_LENGTH
   ) {
     throw new Error("Invalid Cipher envelope");
   }
 
-  if (parsed.mode === "key" && typeof parsed.key !== "string") {
+  if (parsed.mode === "key" && (typeof parsed.key !== "string" || parsed.key.length > 64)) {
     throw new Error("Missing embedded key");
   }
 
-  if (parsed.mode === "code" && typeof parsed.salt !== "string") {
+  if (parsed.mode === "code" && (typeof parsed.salt !== "string" || parsed.salt.length > 64)) {
     throw new Error("Missing derivation salt");
   }
 
@@ -156,9 +164,14 @@ export async function openPayload(token: string, passcode = "") {
   const payload = JSON.parse(decoder.decode(decrypted)) as Partial<CipherPayload>;
   if (
     typeof payload.url !== "string" ||
+    payload.url.length > MAX_URL_LENGTH ||
+    !validateHttpUrl(payload.url) ||
     typeof payload.codename !== "string" ||
+    payload.codename.length > 28 ||
     typeof payload.briefing !== "string" ||
+    payload.briefing.length > 240 ||
     typeof payload.createdAt !== "number" ||
+    (payload.expiresAt !== null && typeof payload.expiresAt !== "number") ||
     typeof payload.burnAfterReveal !== "boolean"
   ) {
     throw new Error("Invalid Cipher payload");
@@ -173,6 +186,8 @@ export async function fingerprintToken(token: string) {
 }
 
 export function validateHttpUrl(value: string) {
+  if (!value || value.length > MAX_URL_LENGTH) return false;
+
   try {
     const url = new URL(value.trim());
     return url.protocol === "https:" || url.protocol === "http:";
