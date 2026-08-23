@@ -26,6 +26,18 @@ function randomBytes(length: number) {
   return crypto.getRandomValues(new Uint8Array(length));
 }
 
+/**
+ * TypeScript 7 models Uint8Array as Uint8Array<ArrayBufferLike>, while the
+ * Web Crypto overloads require BufferSource backed specifically by ArrayBuffer.
+ * Copying at this boundary removes the SharedArrayBuffer possibility from the
+ * type and keeps every crypto call portable across current browsers/toolchains.
+ */
+function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+  const copy = new Uint8Array(bytes.byteLength);
+  copy.set(bytes);
+  return copy.buffer;
+}
+
 function bytesToBase64Url(bytes: Uint8Array) {
   let binary = "";
   for (const byte of bytes) binary += String.fromCharCode(byte);
@@ -77,13 +89,19 @@ export function parseEnvelope(token: string): CipherEnvelope {
 }
 
 async function importAesKey(raw: Uint8Array) {
-  return crypto.subtle.importKey("raw", raw, "AES-GCM", false, ["encrypt", "decrypt"]);
+  return crypto.subtle.importKey(
+    "raw",
+    toArrayBuffer(raw),
+    "AES-GCM",
+    false,
+    ["encrypt", "decrypt"],
+  );
 }
 
 async function deriveKey(passcode: string, salt: Uint8Array) {
   const material = await crypto.subtle.importKey(
     "raw",
-    encoder.encode(passcode),
+    toArrayBuffer(encoder.encode(passcode)),
     "PBKDF2",
     false,
     ["deriveKey"],
@@ -93,7 +111,7 @@ async function deriveKey(passcode: string, salt: Uint8Array) {
     {
       name: "PBKDF2",
       hash: "SHA-256",
-      salt,
+      salt: toArrayBuffer(salt),
       iterations: PBKDF2_ITERATIONS,
     },
     material,
@@ -132,9 +150,9 @@ export async function sealPayload(payload: CipherPayload, passcode: string) {
   }
 
   const encrypted = await crypto.subtle.encrypt(
-    { name: "AES-GCM", iv },
+    { name: "AES-GCM", iv: toArrayBuffer(iv) },
     key,
-    encoder.encode(JSON.stringify(payload)),
+    toArrayBuffer(encoder.encode(JSON.stringify(payload))),
   );
 
   envelope.data = bytesToBase64Url(new Uint8Array(encrypted));
@@ -156,9 +174,9 @@ export async function openPayload(token: string, passcode = "") {
   }
 
   const decrypted = await crypto.subtle.decrypt(
-    { name: "AES-GCM", iv },
+    { name: "AES-GCM", iv: toArrayBuffer(iv) },
     key,
-    encrypted,
+    toArrayBuffer(encrypted),
   );
 
   const payload = JSON.parse(decoder.decode(decrypted)) as Partial<CipherPayload>;
@@ -181,7 +199,10 @@ export async function openPayload(token: string, passcode = "") {
 }
 
 export async function fingerprintToken(token: string) {
-  const digest = await crypto.subtle.digest("SHA-256", encoder.encode(token));
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    toArrayBuffer(encoder.encode(token)),
+  );
   return bytesToBase64Url(new Uint8Array(digest)).slice(0, 24);
 }
 
