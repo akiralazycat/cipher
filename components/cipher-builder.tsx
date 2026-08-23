@@ -86,6 +86,7 @@ export default function CipherBuilder() {
           <input
             type="url"
             inputMode="url"
+            maxLength={4096}
             placeholder="https://example.com/briefing"
             value={url}
             onChange={(event) => setUrl(event.target.value)}
@@ -121,6 +122,7 @@ export default function CipherBuilder() {
           <span className="field-label"><b>04</b> Access code <em>optional</em></span>
           <input
             type="password"
+            maxLength={128}
             value={passcode}
             onChange={(event) => setPasscode(event.target.value)}
             placeholder="Leave blank to embed a random key in the fragment"
