@@ -23,6 +23,22 @@ function formatTimestamp(value: number | null) {
   }).format(value);
 }
 
+function wasBurned(mark: string) {
+  try {
+    return Boolean(window.localStorage.getItem(`cipher:burn:${mark}`));
+  } catch {
+    return false;
+  }
+}
+
+function markBurned(mark: string) {
+  try {
+    window.localStorage.setItem(`cipher:burn:${mark}`, String(Date.now()));
+  } catch {
+    // Storage can be unavailable in hardened/private browser contexts.
+  }
+}
+
 export default function OpenTerminal() {
   const [token, setToken] = useState("");
   const [code, setCode] = useState("");
@@ -52,7 +68,7 @@ export default function OpenTerminal() {
         setToken(fragment);
         setFingerprint(mark);
 
-        if (window.localStorage.getItem(`cipher:burn:${mark}`)) {
+        if (wasBurned(mark)) {
           setPhase("burned");
           return;
         }
@@ -70,7 +86,7 @@ export default function OpenTerminal() {
 
     initialize();
     return () => { cancelled = true; };
-    // decrypt is intentionally called once from the initial fragment.
+    // The fragment is intentionally captured only once when the terminal mounts.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -84,14 +100,23 @@ export default function OpenTerminal() {
       }
 
       setPayload(opened);
-      if (opened.burnAfterReveal && mark) {
-        window.localStorage.setItem(`cipher:burn:${mark}`, String(Date.now()));
-      }
+      if (opened.burnAfterReveal && mark) markBurned(mark);
       setPhase("ready");
     } catch {
-      setErrorPulse(true);
-      setPhase("code");
-      window.setTimeout(() => setErrorPulse(false), 520);
+      let requiresCode = false;
+      try {
+        requiresCode = parseEnvelope(sourceToken).mode === "code";
+      } catch {
+        // The outer state below handles malformed envelopes.
+      }
+
+      if (requiresCode) {
+        setErrorPulse(true);
+        setPhase("code");
+        window.setTimeout(() => setErrorPulse(false), 520);
+      } else {
+        setPhase("denied");
+      }
     }
   }
 
@@ -150,6 +175,7 @@ export default function OpenTerminal() {
               <input
                 autoFocus
                 type="password"
+                maxLength={128}
                 value={code}
                 onChange={(event) => setCode(event.target.value)}
                 placeholder="ACCESS CODE"
