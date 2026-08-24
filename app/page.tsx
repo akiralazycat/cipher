@@ -1,5 +1,4 @@
 import CipherBuilder from "@/components/cipher-builder";
-import { HouseBar } from "@/components/house-bar";
 
 const features = [
   ["01", "Fragment sealed", "The encrypted capsule lives after # in the URL, so the destination is not part of the normal HTTP request to Cipher."],
@@ -10,7 +9,6 @@ const features = [
 export default function Home() {
   return (
     <>
-      <HouseBar product="Cipher" />
       <main className="home-page">
       <div className="ambient-grid" aria-hidden="true" />
       <header className="site-header">
