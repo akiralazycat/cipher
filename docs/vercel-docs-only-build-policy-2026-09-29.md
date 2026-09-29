@@ -54,4 +54,4 @@ Initial cross-project policy document created before implementation.
 
 ### Verification probe
 
-This documentation-only main commit is the live Ignored Build Step probe. It must be ignored by every Vercel target attached to this repository.
+Verification PASS. Probe commit `4f208fb27f667a79b6994f2611bd8f81bf004ad8` was observed as `CANCELED` by Vercel for: cipher. This confirms the Ignored Build Step stopped before build compute.
