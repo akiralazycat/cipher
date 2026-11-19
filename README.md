@@ -36,16 +36,18 @@ The current app intentionally has no analytics and no destination persistence. H
 ## Development
 
 ```bash
-npm install
+npm install --no-package-lock
 npm run dev
 ```
 
-Then open `http://localhost:3000`.
+Use Node.js 22 and open `http://localhost:3000`.
 
 ```bash
-npm run typecheck
 npm run build
+npm run typecheck
 ```
+
+Run the build first on a fresh checkout so that Next.js can generate route types. For capsule changes, create and reopen a capsule with a disposable destination. Check the [security boundary](#security-boundary) before changing URL state or cryptography.
 
 ## Deployment
 
